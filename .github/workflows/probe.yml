@@ -1,0 +1,37 @@
+name: Probe Eastmoney (TEMP)
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner info
+        run: |
+          echo "=== runner public IP ==="
+          curl -s --max-time 15 https://api.ipify.org || echo "ipify failed"
+          echo
+          node --version
+      - name: Fetch 018738 and parse
+        run: |
+          node -e ''
+          (async()=>{
+            const url="https://fund.eastmoney.com/018738.html";
+            const t0=Date.now();
+            const r=await fetch(url,{headers:{"User-Agent":"Mozilla/5.0"}});
+            const html=await r.text();
+            console.log("HTTP",r.status,"bytes",html.length,"ms",Date.now()-t0);
+            const seg=html.match(/交易状态：([sS]{0,500}?)</div>/);
+            const block=seg?seg[1]:"";
+            console.log("BLOCK:",block.replace(/<[^>]*>/g,"").replace(/s+/g," ").trim().slice(0,200));
+            const lim=block.match(/单日累计购买上限s*([d,.]+)s*元/);
+            if(lim) console.log("RESULT: 限大额 "+lim[1]);
+            else if(/暂停申购|暂停销售/.test(block)) console.log("RESULT: 暂停");
+            else if(/开放申购|正常申购/.test(block)) console.log("RESULT: 开放");
+            else console.log("RESULT: 未知");
+          })().catch(e=>{console.error("FETCH FAIL:",e.message);process.exit(1)});
+          ''
+      - name: GitHub API reachability
+        run: |
+          echo "=== api.github.com from Actions ==="
+          curl -s -o /dev/null -w "HTTP %{http_code}
+" --max-time 15 https://api.github.com
